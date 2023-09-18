@@ -1,0 +1,233 @@
+
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.*;
+import java.io.*;
+
+public class Board extends JPanel implements ActionListener {
+    private Image apple;
+    private Image dot;
+    private Image head;
+    private int dots;
+    private final int ALL_DOTS = 1600;
+    private final int[] x = new int[ALL_DOTS];
+    private final int[] y = new int[ALL_DOTS];
+    private final int dot_size = 10;
+    private final int RANDOM_VALUE = 29;
+    private int apple_x;
+    private int apple_y;
+    private Timer timer;
+    private boolean leftDirection = false;
+    private boolean rightDirection = true;
+    private boolean upDirection = false;
+    private boolean downDirection = false;
+    private boolean inGame = true;
+    private int currentScore = 0;
+    private int highScore = 0;
+    private boolean replay = false;
+
+    Board() {
+        addKeyListener(new TAdapter());
+        setBackground(Color.BLACK);
+        setFocusable(true);
+        setPreferredSize(new Dimension(400, 400));
+        loadImages();
+        initGame();
+    }
+
+    public void loadImages() {
+        ImageIcon i1 = new ImageIcon(ClassLoader.getSystemResource("apple.png"));
+        apple = i1.getImage();
+        ImageIcon i2 = new ImageIcon(ClassLoader.getSystemResource("head.png"));
+        head = i2.getImage();
+        ImageIcon i3 = new ImageIcon(ClassLoader.getSystemResource("dot.png"));
+        dot = i3.getImage();
+    }
+
+    public void initGame() {
+        dots = 3;
+        for (int i = 0; i < dots; i++) {
+            y[i] = 50;
+            x[i] = 50 - i * dot_size;
+        }
+        locateApple();
+        loadHighScore();
+        timer = new Timer(140, this);
+        timer.start();
+    }
+
+    public void locateApple() {
+        int r = (int) (Math.random() * RANDOM_VALUE);
+        apple_x = r * dot_size;
+        int q = (int) (Math.random() * RANDOM_VALUE);
+        apple_y = q * dot_size;
+    }
+
+    public void paintComponent(Graphics g) {
+        super.paintComponent(g);
+        if (inGame) {
+            g.drawImage(apple, apple_x, apple_y, this);
+            for (int i = 0; i < dots; i++) {
+                if (i == 0) {
+                    g.drawImage(head, x[i], y[i], this);
+                } else {
+                    g.drawImage(dot, x[i], y[i], this);
+                }
+            }
+            g.setColor(Color.WHITE);
+            g.setFont(new Font("Arial", Font.PLAIN, 12));
+            g.drawString("Score: " + currentScore, 10, 20);
+            g.drawString("High Score: " + highScore, 10, 40);
+            Toolkit.getDefaultToolkit().sync();
+        } else {
+            gameOver(g);
+        }
+    }
+
+    public void gameOver(Graphics g) {
+        String msg = "GAME OVER!!!";
+        Font font = new Font("SANS SERIF", Font.BOLD, 14);
+        FontMetrics metrices = getFontMetrics(font);
+        g.setColor(Color.ORANGE);
+        g.setFont(font);
+        g.drawString(msg, (400 - metrices.stringWidth(msg)) / 2, 400 / 2);
+        g.setColor(Color.WHITE);
+        g.setFont(new Font("Arial", Font.PLAIN, 12));
+        g.drawString("Score: " + currentScore, 10, 20);
+        g.drawString("High Score: " + highScore, 10, 40);
+        
+        if (replay) {
+            g.setColor(Color.GREEN);
+            g.setFont(new Font("Arial", Font.PLAIN, 14));
+            g.drawString("Press 'R' to replay", 150, 200);
+        }
+    }
+
+    public void move() {
+        for (int i = dots; i > 0; i--) {
+            x[i] = x[i - 1];
+            y[i] = y[i - 1];
+        }
+        if (leftDirection) {
+            x[0] = x[0] - dot_size;
+        }
+        if (rightDirection) {
+            x[0] = x[0] + dot_size;
+        }
+        if (upDirection) {
+            y[0] = y[0] - dot_size;
+        }
+        if (downDirection) {
+            y[0] = y[0] + dot_size;
+        }
+    }
+
+    public void checkApple() {
+        if ((x[0] == apple_x) && (y[0] == apple_y)) {
+            dots++;
+            currentScore++;
+            if (currentScore > highScore) {
+                highScore = currentScore;
+                saveHighScore();
+            }
+            locateApple();
+        }
+    }
+
+    public void checkCollision() {
+        for (int i = dots; i > 0; i--) {
+            if ((i > 4) && (x[0] == x[i]) && (y[0] == y[i])) {
+                inGame = false;
+            }
+        }
+        if (x[0] >= 400 || x[0] < 0 || y[0] >= 400 || y[0] < 0) {
+            inGame = false;
+        }
+        if (!inGame) {
+            timer.stop();
+            replay = true;
+        }
+    }
+
+    public void actionPerformed(ActionEvent ae) {
+        if (inGame) {
+            checkApple();
+            checkCollision();
+            move();
+        }
+        repaint();
+    }
+
+    public void loadHighScore() {
+        try (BufferedReader reader = new BufferedReader(new FileReader("highscore.txt"))) {
+            String line = reader.readLine();
+            if (line != null) {
+                highScore = Integer.parseInt(line);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void saveHighScore() {
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter("highscore.txt"))) {
+            writer.write(Integer.toString(highScore));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public class TAdapter extends KeyAdapter {
+        public void keyPressed(KeyEvent e) {
+            int key = e.getKeyCode();
+            if (replay && key == KeyEvent.VK_R) {
+                replayGame();
+            }
+            if (inGame) {
+                if (key == KeyEvent.VK_A && (!rightDirection)) {
+                    leftDirection = true;
+                    upDirection = false;
+                    downDirection = false;
+                }
+                if (key == KeyEvent.VK_D && (!leftDirection)) {
+                    rightDirection = true;
+                    upDirection = false;
+                    downDirection = false;
+                }
+                if (key == KeyEvent.VK_W && (!downDirection)) {
+                    upDirection = true;
+                    leftDirection = false;
+                    rightDirection = false;
+                }
+                if (key == KeyEvent.VK_S && (!upDirection)) {
+                    downDirection = true;
+                    rightDirection = false;
+                    leftDirection = false;
+                }
+            }
+        }
+    }
+
+    public void replayGame() {
+        currentScore = 0;
+        dots = 3;
+        replay = false;
+        initGame();
+        requestFocusInWindow();
+    }
+}
+
+public class SnakeGame extends JFrame {
+    SnakeGame() {
+        super("Snake Game");
+        setResizable(false);
+        add(new Board());
+        pack();
+        setLocationRelativeTo(null);
+        setVisible(true);
+    }
+
+    public static void main(String args[]) {
+        new SnakeGame();
+    }
+}
